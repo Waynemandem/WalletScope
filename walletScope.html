@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WalletScope — Ethereum Wallet Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.0/axios.min.js"></script>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #060810;
+      --surface:   #0d1117;
+      --surface2:  #161b22;
+      --surface3:  #21262d;
+      --border:    rgba(255,255,255,0.07);
+      --accent:    #00d4aa;
+      --accent2:   #0099ff;
+      --accent3:   #ff6b35;
+      --text:      #e6edf3;
+      --muted:     #7d8590;
+      --green:     #3fb950;
+      --red:       #f85149;
+      --font:      'Space Grotesk', sans-serif;
+      --mono:      'Space Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0,212,170,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(0,153,255,0.06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Grid pattern */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ── */
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 60px 20px 48px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 30px rgba(0,212,170,0.3);
+    }
+
+    .logo-text {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    h1 {
+      font-size: clamp(32px, 6vw, 52px);
+      font-weight: 700;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    h1 span {
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 400;
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── Search box ── */
+    .search-wrap {
+      margin: 36px auto 0;
+      max-width: 680px;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 6px 6px 6px 20px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-box:focus-within {
+      border-color: rgba(0,212,170,0.4);
+      box-shadow: 0 0 0 3px rgba(0,212,170,0.08), 0 0 30px rgba(0,212,170,0.1);
+    }
+
+    .search-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 10px 0;
+      min-width: 0;
+    }
+
+    .search-input::placeholder { color: var(--muted); }
+
+    .search-btn {
+      background: linear-gradient(135deg, var(--accent), #00b894);
+      border: none;
+      border-radius: 10px;
+      color: #000;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .search-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0,212,170,0.3);
+    }
+
+    .search-btn:active { transform: translateY(0); }
+    .search-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    /* Quick examples */
+    .examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+      align-items: center;
+    }
+
+    .examples-label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .example-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .example-chip:hover {
+      border-color: rgba(0,212,170,0.3);
+      color: var(--accent);
+      background: rgba(0,212,170,0.05);
+    }
+
+    /* ── Error ── */
+    .error-box {
+      background: rgba(248,81,73,0.08);
+      border: 1px solid rgba(248,81,73,0.2);
+      border-radius: 12px;
+      padding: 14px 18px;
+      color: var(--red);
+      font-size: 14px;
+      margin-top: 20px;
+      display: none;
+    }
+
+    /* ── Loading ── */
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      display: none;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0,212,170,0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ── Results ── */
+    #results { display: none; }
+
+    /* Wallet header card */
+    .wallet-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .wallet-header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    .wallet-address-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .wallet-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .wallet-address {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+      word-break: break-all;
+      flex: 1;
+    }
+
+    .copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .copy-btn:hover { color: var(--accent); border-color: rgba(0,212,170,0.3); }
+
+    /* Stat grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      font-family: var(--mono);
+    }
+
+    /* ── Section ── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .section:nth-child(2) { animation-delay: 0.05s; }
+    .section:nth-child(3) { animation-delay: 0.1s; }
+    .section:nth-child(4) { animation-delay: 0.15s; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title .icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .icon-teal  { background: rgba(0,212,170,0.1); }
+    .icon-blue  { background: rgba(0,153,255,0.1); }
+    .icon-orange{ background: rgba(255,107,53,0.1); }
+
+    .section-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--muted);
+    }
+
+    /* ── Token list ── */
+    .token-list { padding: 8px; }
+
+    .token-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      transition: background 0.15s;
+    }
+
+    .token-row:hover { background: var(--surface2); }
+
+    .token-info { display: flex; align-items: center; gap: 12px; }
+
+    .token-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .token-name { font-size: 14px; font-weight: 600; }
+    .token-symbol { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+    .token-balance {
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .token-usd {
+      text-align: right;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* ── Tx list ── */
+    .tx-list { padding: 8px; }
+
+    .tx-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      transition: background 0.15s;
+    }
+
+    .tx-row:hover { background: var(--surface2); }
+
+    .tx-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .tx-in  { background: rgba(63,185,80,0.1);  color: var(--green); }
+    .tx-out { background: rgba(255,107,53,0.1);  color: var(--accent3); }
+    .tx-fail{ background: rgba(248,81,73,0.1);   color: var(--red); }
+
+    .tx-details { min-width: 0; }
+    .tx-type { font-size: 13px; font-weight: 600; }
+    .tx-addr { font-size: 11px; color: var(--muted); font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .tx-right { text-align: right; flex-shrink: 0; }
+    .tx-value { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+    .tx-date  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .tx-in-val  { color: var(--green); }
+    .tx-out-val { color: var(--accent3); }
+
+    /* Etherscan link */
+    .etherscan-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 14px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .etherscan-link:hover { color: var(--accent); }
+
+    /* ── Price ticker ── */
+    .price-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1px;
+      background: var(--border);
+    }
+
+    .price-cell {
+      background: var(--surface);
+      padding: 16px 20px;
+      transition: background 0.15s;
+    }
+
+    .price-cell:hover { background: var(--surface2); }
+
+    .price-symbol {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .price-usd {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--mono);
+      letter-spacing: -0.5px;
+    }
+
+    .price-change {
+      font-size: 11px;
+      font-family: var(--mono);
+      margin-top: 3px;
+    }
+
+    .up   { color: var(--green); }
+    .down { color: var(--red); }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      header { padding: 40px 0 32px; }
+      h1 { font-size: 28px; }
+      .search-box { flex-direction: column; padding: 12px; gap: 8px; }
+      .search-btn { width: 100%; padding: 14px; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .token-row { grid-template-columns: 1fr auto; }
+      .token-balance { display: none; }
+      .wallet-address { font-size: 11px; }
+      .price-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">◈</div>
+      <span class="logo-text">WalletScope</span>
+    </div>
+    <h1>Explore Any<br><span>Ethereum Wallet</span></h1>
+    <p class="subtitle">
+      Paste any Ethereum address to instantly see balances,
+      token holdings, transaction history and live prices.
+      No sign up. No wallet connect. Free forever.
+    </p>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <div class="search-box">
+        <input
+          type="text"
+          class="search-input"
+          id="addressInput"
+          placeholder="0x... or vitalik.eth"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="search-btn" id="searchBtn" onclick="lookup()">
+          Explore Wallet →
+        </button>
+      </div>
+
+      <!-- Example addresses -->
+      <div class="examples">
+        <span class="examples-label">Try:</span>
+        <span class="example-chip" onclick="setExample('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')">Vitalik</span>
+        <span class="example-chip" onclick="setExample('0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503')">Binance</span>
+        <span class="example-chip" onclick="setExample('0x28C6c06298d514Db089934071355E5743bf21d60')">Binance 2</span>
+      </div>
+
+      <div class="error-box" id="errorBox"></div>
+    </div>
+  </header>
+
+  <!-- ── Loading ── -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Fetching wallet data…</p>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="results">
+
+    <!-- Wallet summary card -->
+    <div class="wallet-header" id="walletHeader"></div>
+
+    <!-- Token holdings -->
+    <div class="section" id="tokensSection">
+      <div class="section-header">
+        <div class="section-title">
+          <div class="icon icon-teal">◎</div>
+          Token Holdings
+        </div>
+        <span class="section-badge" id="tokenCount">0 tokens</span>
+      </div>
+      <div class="token-list" id="tokenList"></div>
+    </div>
+
+    <!-- Transactions -->
+    <div class="section" id="txSection">
+      <div class="section-header">
+        <div class="section-title">
+          <div class="icon icon-blue">⟳</div>
+          Recent Transactions
+        </div>
+        <a id="etherscanLink" href="#" target="_blank" class="section-badge" style="text-decoration:none; cursor:pointer;">
+          View all ↗
+        </a>
+      </div>
+      <div class="tx-list" id="txList"></div>
+      <a class="etherscan-link" id="etherscanFull" href="#" target="_blank">
+        View full history on Etherscan ↗
+      </a>
+    </div>
+
+    <!-- Live prices -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <div class="icon icon-orange">◐</div>
+          Live Market Prices
+        </div>
+        <span class="section-badge" id="priceRefresh">Live</span>
+      </div>
+      <div class="price-grid" id="priceGrid"></div>
+    </div>
+
+  </div><!-- /results -->
+
+</div><!-- /wrapper -->
+
+<footer>
+  <p>WalletScope · Data from <a href="https://etherscan.io" target="_blank">Etherscan</a> + <a href="https://coingecko.com" target="_blank">CoinGecko</a> · No data is stored</p>
+</footer>
+
+<script>
+// ── Config ── 
+// Replace with your actual keys
+const ETHERSCAN_KEY  = 'WNGVGIACSKVW2B7EVK8MWKZCIQ7ZGUAB73ZGTC7MY1SMJHZQ5'
+const COINGECKO_KEY  = ''   // optional
+
+const COIN_IDS = [
+  { id: 'ethereum',         symbol: 'ETH',   name: 'Ethereum',       color: '#627eea' },
+  { id: 'usd-coin',         symbol: 'USDC',  name: 'USD Coin',       color: '#2775ca' },
+  { id: 'tether',           symbol: 'USDT',  name: 'Tether',         color: '#26a17b' },
+  { id: 'dai',              symbol: 'DAI',   name: 'Dai',            color: '#f5ac37' },
+  { id: 'uniswap',          symbol: 'UNI',   name: 'Uniswap',        color: '#ff007a' },
+  { id: 'wrapped-bitcoin',  symbol: 'WBTC',  name: 'Wrapped BTC',    color: '#f7931a' },
+  { id: 'matic-network',    symbol: 'MATIC', name: 'Polygon',        color: '#8247e5' },
+]
+
+// ERC-20 tokens to check
+const ERC20_TOKENS = [
+  { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', symbol: 'USDC',  decimals: 6,  coinId: 'usd-coin' },
+  { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', symbol: 'USDT',  decimals: 6,  coinId: 'tether' },
+  { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', symbol: 'DAI',   decimals: 18, coinId: 'dai' },
+  { address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', symbol: 'UNI',   decimals: 18, coinId: 'uniswap' },
+  { address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', symbol: 'WBTC',  decimals: 8,  coinId: 'wrapped-bitcoin' },
+  { address: '0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0', symbol: 'MATIC', decimals: 18, coinId: 'matic-network' },
+]
+
+// ── State ──
+let currentAddress = ''
+let prices = {}
+
+// ── Helpers ──
+function shortAddr(addr) {
+  return addr ? `${addr.slice(0,6)}…${addr.slice(-4)}` : ''
+}
+
+function formatUSD(val) {
+  if (val == null || isNaN(val)) return '—'
+  if (val >= 1_000_000) return `$${(val/1_000_000).toFixed(2)}M`
+  if (val >= 1_000)     return `$${(val/1_000).toFixed(2)}K`
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD',
+    minimumFractionDigits: val < 1 ? 4 : 2,
+    maximumFractionDigits: val < 1 ? 6 : 2,
+  }).format(val)
+}
+
+function formatDate(ts) {
+  return new Date(Number(ts) * 1000).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric'
+  })
+}
+
+function setExample(addr) {
+  document.getElementById('addressInput').value = addr
+  lookup()
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox')
+  el.textContent = msg
+  el.style.display = 'block'
+}
+
+function hideError() {
+  document.getElementById('errorBox').style.display = 'none'
+}
+
+// Generate a color avatar from address
+function makeAvatar(address) {
+  const colors = ['#627eea','#2775ca','#26a17b','#f5ac37','#ff007a','#f7931a','#8247e5','#00d4aa']
+  const idx = parseInt(address.slice(2,4), 16) % colors.length
+  const c = colors[idx]
+  return `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><circle cx='22' cy='22' r='22' fill='${encodeURIComponent(c)}20'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='${encodeURIComponent(c)}'>◈</text></svg>`
+}
+
+// ── Main lookup ──
+async function lookup() {
+  const input = document.getElementById('addressInput').value.trim()
+  if (!input) return
+
+  // Basic validation
+  if (!input.startsWith('0x') || input.length !== 42) {
+    showError('Please enter a valid Ethereum address (0x... 42 characters)')
+    return
+  }
+
+  hideError()
+  currentAddress = input.toLowerCase()
+
+  // Show loading
+  document.getElementById('loading').style.display = 'block'
+  document.getElementById('results').style.display = 'none'
+  document.getElementById('searchBtn').disabled = true
+  document.getElementById('searchBtn').textContent = 'Loading…'
+
+  try {
+    // Fetch everything in parallel
+    const [ethBal, tokenBals, txs, priceData] = await Promise.allSettled([
+      fetchETHBalance(input),
+      fetchTokenBalances(input),
+      fetchTransactions(input),
+      fetchPrices(),
+    ])
+
+    prices = priceData.status === 'fulfilled' ? priceData.value : {}
+
+    renderResults(
+      input,
+      ethBal.status === 'fulfilled' ? ethBal.value : 0,
+      tokenBals.status === 'fulfilled' ? tokenBals.value : [],
+      txs.status === 'fulfilled' ? txs.value : [],
+    )
+
+  } catch (err) {
+    showError('Something went wrong. Please try again.')
+  } finally {
+    document.getElementById('loading').style.display = 'none'
+    document.getElementById('searchBtn').disabled = false
+    document.getElementById('searchBtn').textContent = 'Explore Wallet →'
+  }
+}
+
+// ── API calls ──
+async function fetchETHBalance(address) {
+  const { data } = await axios.get('https://api.etherscan.io/v2/api', {
+    params: {
+      chainid: 1, module: 'account', action: 'balance',
+      address, tag: 'latest', apikey: ETHERSCAN_KEY,
+    }
+  })
+  return data.status === '1' ? parseInt(data.result) / 1e18 : 0
+}
+
+async function fetchTokenBalances(address) {
+  const results = await Promise.allSettled(
+    ERC20_TOKENS.map(async token => {
+      const { data } = await axios.get('https://api.etherscan.io/v2/api', {
+        params: {
+          chainid: 1, module: 'account', action: 'tokenbalance',
+          contractaddress: token.address,
+          address, tag: 'latest', apikey: ETHERSCAN_KEY,
+        }
+      })
+      const balance = data.status === '1'
+        ? parseInt(data.result) / Math.pow(10, token.decimals)
+        : 0
+      return { ...token, balance }
+    })
+  )
+  return results
+    .filter(r => r.status === 'fulfilled' && r.value.balance > 0)
+    .map(r => r.value)
+}
+
+async function fetchTransactions(address) {
+  const { data } = await axios.get('https://api.etherscan.io/v2/api', {
+    params: {
+      chainid: 1, module: 'account', action: 'txlist',
+      address, startblock: 0, endblock: 99999999,
+      page: 1, offset: 15, sort: 'desc',
+      apikey: ETHERSCAN_KEY,
+    }
+  })
+  return data.status === '1' ? data.result : []
+}
+
+async function fetchPrices() {
+  const ids = COIN_IDS.map(c => c.id).join(',')
+  const headers = COINGECKO_KEY ? { 'x-cg-demo-api-key': COINGECKO_KEY } : {}
+  const { data } = await axios.get('https://api.coingecko.com/api/v3/simple/price', {
+    params: { ids, vs_currencies: 'usd', include_24hr_change: true },
+    headers,
+  })
+  return data
+}
+
+// ── Render ──
+function renderResults(address, ethBalance, tokens, txs) {
+
+  // ── Wallet header ──
+  const ethPrice   = prices['ethereum']?.usd ?? 0
+  const ethUSD     = ethBalance * ethPrice
+  let totalUSD     = ethUSD
+
+  tokens.forEach(t => {
+    const p = prices[t.coinId]?.usd ?? 0
+    totalUSD += t.balance * p
+  })
+
+  const avatar = makeAvatar(address)
+
+  document.getElementById('walletHeader').innerHTML = `
+    <div class="wallet-address-row">
+      <img class="wallet-avatar" src="${avatar}" alt="wallet" />
+      <div class="wallet-address">${address}</div>
+      <button class="copy-btn" onclick="copyAddress('${address}')">Copy</button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-item">
+        <div class="stat-label">Total Value</div>
+        <div class="stat-value" style="background:linear-gradient(90deg,#00d4aa,#0099ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">
+          ${formatUSD(totalUSD)}
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">ETH Balance</div>
+        <div class="stat-value">${ethBalance.toFixed(4)}</div>
+        <div class="stat-sub">${formatUSD(ethUSD)}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">ETH Price</div>
+        <div class="stat-value">${formatUSD(ethPrice)}</div>
+        <div class="stat-sub ${(prices['ethereum']?.usd_24h_change??0) >= 0 ? 'up' : 'down'}">
+          ${(prices['ethereum']?.usd_24h_change??0) >= 0 ? '▲' : '▼'} 
+          ${Math.abs(prices['ethereum']?.usd_24h_change??0).toFixed(2)}%
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Tokens</div>
+        <div class="stat-value">${tokens.length + 1}</div>
+        <div class="stat-sub">assets held</div>
+      </div>
+    </div>
+  `
+
+  // ── Tokens ──
+  document.getElementById('tokenCount').textContent = `${tokens.length + 1} tokens`
+  const tokenColors = { ETH:'#627eea',USDC:'#2775ca',USDT:'#26a17b',DAI:'#f5ac37',UNI:'#ff007a',WBTC:'#f7931a',MATIC:'#8247e5' }
+
+  const allTokens = [
+    { symbol: 'ETH', name: 'Ethereum', balance: ethBalance, coinId: 'ethereum' },
+    ...tokens
+  ]
+
+  document.getElementById('tokenList').innerHTML = allTokens.map(t => {
+    const p   = prices[t.coinId]?.usd ?? 0
+    const usd = t.balance * p
+    const c   = tokenColors[t.symbol] || '#7d8590'
+    return `
+      <div class="token-row">
+        <div class="token-info">
+          <div class="token-icon" style="background:${c}22;color:${c}">${t.symbol.slice(0,2)}</div>
+          <div>
+            <div class="token-name">${t.symbol}</div>
+            <div class="token-symbol">${t.name}</div>
+          </div>
+        </div>
+        <div class="token-balance">${t.balance.toFixed(4)}</div>
+        <div class="token-usd">${formatUSD(usd)}</div>
+      </div>
+    `
+  }).join('') || '<div class="empty">No tokens found</div>'
+
+  // ── Transactions ──
+  document.getElementById('etherscanLink').href  = `https://etherscan.io/address/${address}`
+  document.getElementById('etherscanFull').href  = `https://etherscan.io/address/${address}`
+
+  document.getElementById('txList').innerHTML = txs.length === 0
+    ? '<div class="empty">No transactions found</div>'
+    : txs.map(tx => {
+        const isIn     = tx.to?.toLowerCase() === address.toLowerCase()
+        const isFailed = tx.isError === '1'
+        const valEth   = (parseInt(tx.value) / 1e18).toFixed(4)
+        const iconClass = isFailed ? 'tx-fail' : isIn ? 'tx-in' : 'tx-out'
+        const icon      = isFailed ? '✕' : isIn ? '↓' : '↑'
+        const label     = isFailed ? 'Failed' : isIn ? 'Received' : 'Sent'
+        const peer      = isIn ? tx.from : tx.to
+        const valClass  = isFailed ? '' : isIn ? 'tx-in-val' : 'tx-out-val'
+        const prefix    = isIn ? '+' : '-'
+
+        return `
+          <div class="tx-row">
+            <div class="tx-icon ${iconClass}">${icon}</div>
+            <div class="tx-details">
+              <div class="tx-type">${label}</div>
+              <div class="tx-addr">${isIn ? 'From' : 'To'}: ${shortAddr(peer)}</div>
+            </div>
+            <div class="tx-right">
+              <div class="tx-value ${valClass}">${isFailed ? '—' : prefix + valEth + ' ETH'}</div>
+              <div class="tx-date">${formatDate(tx.timeStamp)}</div>
+            </div>
+          </div>
+        `
+      }).join('')
+
+  // ── Prices ──
+  document.getElementById('priceGrid').innerHTML = COIN_IDS.map(coin => {
+    const p  = prices[coin.id]
+    const ch = p?.usd_24h_change ?? 0
+    return `
+      <div class="price-cell">
+        <div class="price-symbol">${coin.symbol}</div>
+        <div class="price-usd">${p ? formatUSD(p.usd) : '—'}</div>
+        <div class="price-change ${ch >= 0 ? 'up' : 'down'}">
+          ${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(2)}%
+        </div>
+      </div>
+    `
+  }).join('')
+
+  // Show results
+  document.getElementById('results').style.display = 'block'
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// ── Copy address ──
+function copyAddress(addr) {
+  navigator.clipboard.writeText(addr).then(() => {
+    const btn = document.querySelector('.copy-btn')
+    btn.textContent = 'Copied!'
+    setTimeout(() => btn.textContent = 'Copy', 2000)
+  })
+}
+
+// ── Enter key support ──
+document.getElementById('addressInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') lookup()
+})
+</script>
+</body>
+</html>
