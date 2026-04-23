@@ -752,6 +752,11 @@ function formatDate(ts) {
 }
 
 function setExample(addr) {
+  document.getElementById('walletHeader').innerHTML = ''
+  document.getElementById('tokenList').innerHTML = ''
+  document.getElementById('txList').innerHTML = ''
+  document.getElementById('priceGrid').innerHTML = ''
+  document.getElementById('results').style.display = 'none'
   document.getElementById('addressInput').value = addr
   lookup()
 }
@@ -785,17 +790,23 @@ async function lookup() {
     return
   }
 
+  // ── CLEAR previous results immediately ──
+  document.getElementById('walletHeader').innerHTML = ''
+  document.getElementById('tokenList').innerHTML = ''
+  document.getElementById('txList').innerHTML = ''
+  document.getElementById('priceGrid').innerHTML = ''
+  document.getElementById('results').style.display = 'none'
+
   hideError()
   currentAddress = input.toLowerCase()
 
   // Show loading
   document.getElementById('loading').style.display = 'block'
-  document.getElementById('results').style.display = 'none'
   document.getElementById('searchBtn').disabled = true
   document.getElementById('searchBtn').textContent = 'Loading…'
 
   try {
-    // Fetch everything in parallel
+    // Fetch everything fresh in parallel
     const [ethBal, tokenBals, txs, priceData] = await Promise.allSettled([
       fetchETHBalance(input),
       fetchTokenBalances(input),
