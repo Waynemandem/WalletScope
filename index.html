@@ -702,7 +702,7 @@
 // ── Config ── 
 // Replace with your actual keys
 const ETHERSCAN_KEY  = 'DSUE27HD4TZPYR7RAVW5V31QRUHBG51Z2R'
-const COINGECKO_KEY  = 'CG-1hg86irWbgZM27SY5czPYk9Y'   //     optional
+const COINGECKO_KEY  = 'CG-1hg86irWbgZM27SY5czPYk9Y'
 
 const COIN_IDS = [
   { id: 'ethereum',               symbol: 'ETH',  name: 'Ethereum',       color: '#627eea' },
@@ -803,21 +803,17 @@ async function lookup() {
   document.getElementById('searchBtn').textContent = 'Loading…'
 
   try {
-    const [ethBal, tokenBals, txs, priceData] = await Promise.allSettled([
-      fetchETHBalance(input),
-      fetchTokenBalances(input),
-      fetchTransactions(input),
-      fetchPrices(),
-    ])
+    // Sequential calls with delays to avoid rate limiting
+    const ethBal    = await fetchETHBalance(input).catch(() => 0)
+    await sleep(300)
+    const tokenBals = await fetchTokenBalances(input).catch(() => [])
+    await sleep(300)
+    const txs       = await fetchTransactions(input).catch(() => [])
+    await sleep(300)
+    prices          = await fetchPrices().catch(() => {})
 
-    prices = priceData.status === 'fulfilled' ? priceData.value : {}
+    renderResults(input, ethBal, tokenBals, txs)
 
-    renderResults(
-      input,
-      ethBal.status === 'fulfilled' ? ethBal.value : 0,
-      tokenBals.status === 'fulfilled' ? tokenBals.value : [],
-      txs.status === 'fulfilled' ? txs.value : [],
-    )
   } catch (err) {
     showError('Something went wrong. Please try again.')
   } finally {
@@ -826,6 +822,7 @@ async function lookup() {
     document.getElementById('searchBtn').textContent = 'Explore Wallet →'
   }
 }
+
 
 // ── API calls ──
 async function fetchETHBalance(address) {
@@ -860,34 +857,48 @@ async function fetchTokenBalances(address) {
     .map(r => r.value)
 }
 
-async function fetchTransactions(address) {
-  // Try normal transactions first
-  const { data } = await axios.get('https://api.etherscan.io/v2/api', {
-    params: {
-      chainid: 1, module: 'account', action: 'txlist',
-      address, startblock: 0, endblock: 99999999,
-      page: 1, offset: 15, sort: 'desc',
-      apikey: ETHERSCAN_KEY,
-    }
-  })
-
-  if (data.status === '1' && data.result.length > 0) {
-    return data.result
-  }
-
-  // Fall back to internal transactions (for contract wallets like SharkWhale)
-  const { data: internal } = await axios.get('https://api.etherscan.io/v2/api', {
-    params: {
-      chainid: 1, module: 'account', action: 'txlistinternal',
-      address, startblock: 0, endblock: 99999999,
-      page: 1, offset: 15, sort: 'desc',
-      apikey: ETHERSCAN_KEY,
-    }
-  })
-
-  return internal.status === '1' ? internal.result : []
+// Helper to pause between calls
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+async function fetchTransactions(address) {
+  try {
+    // Wait 500ms to avoid rate limit
+    await sleep(500)
+
+    const { data } = await axios.get('https://api.etherscan.io/v2/api', {
+      params: {
+        chainid: 1, module: 'account', action: 'txlist',
+        address, startblock: 0, endblock: 99999999,
+        page: 1, offset: 15, sort: 'desc',
+        apikey: ETHERSCAN_KEY,
+      }
+    })
+
+    if (data.status === '1' && data.result.length > 0) {
+      return data.result
+    }
+
+    // Wait again before fallback call
+    await sleep(500)
+
+    // Fall back to internal transactions
+    const { data: internal } = await axios.get('https://api.etherscan.io/v2/api', {
+      params: {
+        chainid: 1, module: 'account', action: 'txlistinternal',
+        address, startblock: 0, endblock: 99999999,
+        page: 1, offset: 15, sort: 'desc',
+        apikey: ETHERSCAN_KEY,
+      }
+    })
+
+    return internal.status === '1' ? internal.result : []
+
+  } catch (err) {
+    return []
+  }
+}
 async function fetchPrices() {
   const ids = COIN_IDS.map(c => c.id).join(',')
   const headers = COINGECKO_KEY ? { 'x-cg-demo-api-key': COINGECKO_KEY } : {}
